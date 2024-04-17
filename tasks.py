@@ -196,6 +196,7 @@ def run(c):
         )
         voices.append(voice)
     updated_voices = get_updated_voices(voices)
+    _LOGGER.info(f"Found {len(updated_voices)} new voices")
     # Export and package
     for voice in updated_voices:
         _LOGGER.info(f"Processing voice: {voice.name}")
