@@ -27,11 +27,10 @@ class Voice:
 
 
 def export_and_package(c, voice, export_script_path, working_dir):
-    _LOGGER.info("Downloading checkpoint...")
     export_dir = working_dir.joinpath("exported")
     export_dir.mkdir(parents=True, exist_ok=True)
     checkpoint_url = CHECKPOINTS_URL_PREFIX.format(voice.checkpoint)
-    _LOGGER.info("Cloning piper repo")
+    _LOGGER.info("Downloading checkpoint...")
     checkpoint_response = requests.get(checkpoint_url)
     checkpoint_response.raise_for_status()
     downloaded_checkpoint_filename = working_dir.joinpath("checkpoint.ckpt")
@@ -112,7 +111,7 @@ def run(c):
             c.run("pip3 install -r requirements.txt")
             c.run("source build_monotonic_align.sh")
     # Force upgrade torch for best export results
-    c.run("pip3 install --upgrade torch pytorch-lightning")
+    c.run("pip3 install --upgrade torch pytorch-lightning onnx")
     # Paths
     export_script_path = Path.cwd().joinpath("piper", "src", "python")
     working_dir = Path.cwd().joinpath("workspace")
