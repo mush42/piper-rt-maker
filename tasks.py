@@ -26,7 +26,7 @@ class Voice:
     etag: str
 
 
-def export_and_package(c, voice, working_dir):
+def export_and_package(c, voice, export_script_path, working_dir):
     _LOGGER.info("Downloading checkpoint...")
     export_dir = working_dir.joinpath("exported")
     export_dir.mkdir(parents=True, exist_ok=True)
@@ -37,8 +37,13 @@ def export_and_package(c, voice, working_dir):
     with open(downloaded_checkpoint_filename, "wb") as file:
         for chunk in checkpoint_response.iter_content(chunk_size=None):
             file.write(chunk)
-    with c.cd(working_dir):
-        c.run("python3 -m piper_train.export_onnx_streaming --debug ./checkpoint.ckpt ./exported")
+    with c.cd(export_script_path):
+        export_cmd = " ".join([
+            "python3 -m piper_train.export_onnx_streaming --debug",
+            os.fspath(downloaded_checkpoint_filename),
+            os.fspath(export_dir),
+        ])
+        c.run(export_cmd)
     # Config
     config_url = CHECKPOINTS_URL_PREFIX.format(voice.config)
     config_json = requests.get(config_url).json()
@@ -100,6 +105,10 @@ def run(c):
     _LOGGER.info("Installing piper deps.")
     with c.cd("./piper/src/python"):
         c.run("pip3 install -r requirements.txt")
+    # Force upgrade torch for best export results
+    c.run("pip3 install --upgrade torch")
+    # Paths
+    export_script_path = Path.cwd().joinpath("piper", "src", "python")
     working_dir = Path.cwd().joinpath("workspace")
     working_dir.mkdir(parents=True, exist_ok=True)
     hf_client = HfApi()
@@ -136,7 +145,7 @@ def run(c):
     for voice in voices:
         _LOGGER.info(f"Processing voice: {voice.name}")
         try:
-            export_and_package(c, voice, working_dir)
+            export_and_package(c, voice, export_script_path, working_dir)
         except:
             _LOGGER.error("Failed to export and package voice", exc_info=True)
             continue
