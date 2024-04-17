@@ -34,9 +34,11 @@ def export_and_package(c, voice, export_script_path, working_dir):
     checkpoint_response = requests.get(checkpoint_url, stream=True)
     checkpoint_response.raise_for_status()
     downloaded_checkpoint_filename = working_dir.joinpath("checkpoint.ckpt")
+    _LOGGER.info("Downloading checkpoint.")
     with open(downloaded_checkpoint_filename, "wb") as file:
         for chunk in checkpoint_response.iter_content(chunk_size=None):
             file.write(chunk)
+    _LOGGER.info("Exporting to ONNX.")
     with c.cd(export_script_path):
         export_cmd = " ".join([
             "python3 -m piper_train.export_onnx_streaming --debug",
@@ -45,6 +47,7 @@ def export_and_package(c, voice, export_script_path, working_dir):
         ])
         c.run(export_cmd)
     # Config
+    _LOGGER.info("Preparing config.")
     config_url = CHECKPOINTS_URL_PREFIX.format(voice.config)
     config_json = requests.get(config_url).json()
     config_json["streaming"] = True
@@ -60,11 +63,13 @@ def export_and_package(c, voice, export_script_path, working_dir):
         encoding="utf-8",
         newline="\n"
     )
+    _LOGGER.info("Packaging voice...")
     package_filename = working_dir.joinpath(f"{new_name}.tar.gz")
     with tarfile.TarFile(package_filename, "w") as pack:
         for file in export_dir.iterdir():
             pack.add(os.fspath(file.resolve()), arcname=file.name)
     # Upload to hf-hub
+    _LOGGER.info("Uploading voice...")
     hf_client.upload_file(
         path_or_fileobj=package_filename,
         path_in_repo=package_filename.name,
@@ -72,11 +77,13 @@ def export_and_package(c, voice, export_script_path, working_dir):
         repo_type="dataset",
     )
     # Cleanup
+    _LOGGER.info("Cleaning up...")
     with c.cd(working_dir):
         c.run("rm -rf *")
 
 
 def dump_voices_metadata(voices, working_dir):
+    _LOGGER.info("Dumping voice metadata.")
     dst_json_filename = working_dir.joinpath("metadata.json")
     data = [
         asdict(voice)
@@ -99,7 +106,8 @@ def run(c):
     _LOGGER.info("Installing basic deps.")
     c.run("pip3 install -r requirements.txt")
     _LOGGER.info("Cloning piper repo")
-    c.run("git clone https://github.com/mush42/piper")
+    if not Path.cwd().joinpath("piper").is_dir():
+        c.run("git clone https://github.com/mush42/piper")
     with c.cd("./piper"):
         c.run("git checkout streaming")
     _LOGGER.info("Installing piper deps.")
