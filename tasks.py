@@ -17,6 +17,7 @@ HF_CLIENT = HfApi()
 PIPER_CHECKPOINTS_DATASET = "rhasspy/piper-checkpoints"
 RT_VOICES_DATASET = "mush42/piper-rt"
 CHECKPOINTS_URL_PREFIX = "https://huggingface.co/datasets/rhasspy/piper-checkpoints/resolve/main/{}"
+VOICES_URL_PREFIX = "https://huggingface.co/datasets/mush42/piper-rt/resolve/main/{}"
 
 
 @dataclass
@@ -25,6 +26,27 @@ class Voice:
     config: str
     checkpoint: str
     etag: str
+
+
+def get_updated_voices(voices):
+    metadata_response = requests.get(VOICES_URL_PREFIX.format("metadata.json"))
+    if metadata_response.status_code == 401:
+        return voices
+    metadata_response.raise_for_status()
+    processed_voices = [
+        Voice(**d)
+        for d in metadata_response.json()
+    ]
+    retval = []
+    for v in voices:
+        already_processed = any([
+            (p.config == v.config) and (p.checkpoint == v.checkpoint) and (p.etag == v.etag)
+            for p in processed_voices
+        ])
+        if already_processed:
+            continue
+        retval.append(v)
+    return retval
 
 
 def export_and_package(c, voice, export_script_path, working_dir):
@@ -111,8 +133,8 @@ def run(c):
         with c.cd("./piper/src/python"):
             c.run("pip3 install -r requirements.txt")
             c.run("source build_monotonic_align.sh")
-    # Force upgrade torch for best export results
-    c.run("pip3 install --upgrade torch pytorch-lightning onnx")
+        # Force upgrade torch for best export results
+        c.run("pip3 install --upgrade torch pytorch-lightning onnx")
     # Paths
     export_script_path = Path.cwd().joinpath("piper", "src", "python")
     working_dir = Path.cwd().joinpath("workspace")
@@ -131,7 +153,7 @@ def run(c):
         voice_name = "-".join(cfg_file.parent.parts[1:])
         try:
             checkpoint_file = next(filter(
-                lambda f: (f.parent == cfg_file.parent) and ("epoch" in f.name),
+                lambda f: (f.parent == cfg_file.parent) and f.suffix == ".ckpt",
                 files
             ))
         except StopIteration:
@@ -146,8 +168,9 @@ def run(c):
             etag=file_metadata.etag
         )
         voices.append(voice)
+    updated_voices = get_updated_voices(voices)
     # Export and package
-    for voice in voices:
+    for voice in updated_voices:
         _LOGGER.info(f"Processing voice: {voice.name}")
         try:
             export_and_package(c, voice, export_script_path, working_dir)
