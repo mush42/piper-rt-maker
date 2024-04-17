@@ -31,13 +31,11 @@ def export_and_package(c, voice, export_script_path, working_dir):
     export_dir = working_dir.joinpath("exported")
     export_dir.mkdir(parents=True, exist_ok=True)
     checkpoint_url = CHECKPOINTS_URL_PREFIX.format(voice.checkpoint)
-    checkpoint_response = requests.get(checkpoint_url, stream=True)
+    _LOGGER.info("Cloning piper repo")
+    checkpoint_response = requests.get(checkpoint_url)
     checkpoint_response.raise_for_status()
     downloaded_checkpoint_filename = working_dir.joinpath("checkpoint.ckpt")
-    _LOGGER.info("Downloading checkpoint.")
-    with open(downloaded_checkpoint_filename, "wb") as file:
-        for chunk in checkpoint_response.iter_content(chunk_size=None):
-            file.write(chunk)
+    downloaded_checkpoint_filename.write_bytes(checkpoint_response.content)
     _LOGGER.info("Exporting to ONNX.")
     with c.cd(export_script_path):
         export_cmd = " ".join([
@@ -104,15 +102,15 @@ def run(c):
     logging.basicConfig(level=logging.INFO)
 
     _LOGGER.info("Installing basic deps.")
-    c.run("pip3 install -r requirements.txt")
-    _LOGGER.info("Cloning piper repo")
     if not Path.cwd().joinpath("piper").is_dir():
+        _LOGGER.info("Cloning piper repo")
         c.run("git clone https://github.com/mush42/piper")
-    with c.cd("./piper"):
-        c.run("git checkout streaming")
-    _LOGGER.info("Installing piper deps.")
-    with c.cd("./piper/src/python"):
-        c.run("pip3 install -r requirements.txt")
+        with c.cd("./piper"):
+            c.run("git checkout streaming")
+        _LOGGER.info("Installing piper deps.")
+        with c.cd("./piper/src/python"):
+            c.run("pip3 install -r requirements.txt")
+            c.run("source build_monotonic_align.sh")
     # Force upgrade torch for best export results
     c.run("pip3 install --upgrade torch pytorch-lightning")
     # Paths
