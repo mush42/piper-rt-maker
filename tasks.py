@@ -132,6 +132,7 @@ def dump_voices_metadata(voices, working_dir):
                 f"{name}+RT",
                 quality
             ])
+            vdata["base"] = vdata["key"]
             vdata["key"] = new_name
             vdata["streaming"] = True
             vdata["files"] = [f"{new_name}.tar.gz"]
