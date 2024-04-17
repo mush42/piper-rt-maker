@@ -13,6 +13,7 @@ from invoke import task
 
 
 _LOGGER = logging.getLogger("piper.rt")
+HF_CLIENT = HfApi()
 PIPER_CHECKPOINTS_DATASET = "rhasspy/piper-checkpoints"
 RT_VOICES_DATASET = "mush42/piper-rt"
 CHECKPOINTS_URL_PREFIX = "https://huggingface.co/datasets/rhasspy/piper-checkpoints/resolve/main/{}"
@@ -67,7 +68,7 @@ def export_and_package(c, voice, export_script_path, working_dir):
             pack.add(os.fspath(file.resolve()), arcname=file.name)
     # Upload to hf-hub
     _LOGGER.info("Uploading voice...")
-    hf_client.upload_file(
+    HF_CLIENT.upload_file(
         path_or_fileobj=package_filename,
         path_in_repo=package_filename.name,
         repo_id=RT_VOICES_DATASET,
@@ -88,7 +89,7 @@ def dump_voices_metadata(voices, working_dir):
     ]
     with open(dst_json_filename, "w", encoding="utf-8", newline="\n") as file:
         json.dump(data, file, indent=2, ensure_ascii=False)
-    hf_client.upload_file(
+    HF_CLIENT.upload_file(
         path_or_fileobj=dst_json_filename,
         path_in_repo=dst_json_filename.name,
         repo_id=RT_VOICES_DATASET,
@@ -116,8 +117,7 @@ def run(c):
     export_script_path = Path.cwd().joinpath("piper", "src", "python")
     working_dir = Path.cwd().joinpath("workspace")
     working_dir.mkdir(parents=True, exist_ok=True)
-    hf_client = HfApi()
-    all_files = hf_client.list_repo_files(
+    all_files = HF_CLIENT.list_repo_files(
         PIPER_CHECKPOINTS_DATASET,
         repo_type="dataset"
     )
@@ -136,7 +136,7 @@ def run(c):
             ))
         except StopIteration:
             continue
-        file_metadata = hf_client.get_hf_file_metadata(
+        file_metadata = HF_CLIENT.get_hf_file_metadata(
             url=CHECKPOINTS_URL_PREFIX.format(checkpoint_file)
         )
         voice = Voice(
