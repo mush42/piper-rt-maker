@@ -113,6 +113,8 @@ def run(c):
     _LOGGER.info("Installing piper deps.")
     with c.cd("./piper/src/python"):
         c.run("pip3 install -r requirements.txt")
+    # Force upgrade torch for best export results
+    c.run("pip3 install --upgrade torch pytorch-lightning")
     # Paths
     export_script_path = Path.cwd().joinpath("piper", "src", "python")
     working_dir = Path.cwd().joinpath("workspace")
