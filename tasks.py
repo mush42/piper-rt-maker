@@ -122,7 +122,7 @@ def dump_voices_metadata(voices, working_dir):
     piper_voices = requests.get(
         "https://huggingface.co/rhasspy/piper-voices/resolve/main/voices.json"
     ).json()
-    std_voice_names = frozenset([v.name for v in processed_voices])
+    std_voice_names = frozenset([v["name"] for v in processed_voices])
     rt_voices = {}
     for (vname, vdata) in piper_voices.items():
         if vname in std_voice_names:
@@ -151,7 +151,7 @@ def dump_voices_metadata(voices, working_dir):
 def run(c):
     logging.basicConfig(level=logging.INFO)
 
-    _LOGGER.info("Installing basic deps.")
+    _LOGGER.info("Starting...")
     if not Path.cwd().joinpath("piper").is_dir():
         _LOGGER.info("Cloning piper repo")
         c.run("git clone https://github.com/mush42/piper")
