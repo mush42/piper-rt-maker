@@ -31,6 +31,7 @@ class Voice:
 def get_updated_voices(voices):
     metadata_response = requests.get(VOICES_URL_PREFIX.format("metadata.json"))
     if metadata_response.status_code == 401:
+        _LOGGER.info("No existing metadata file. Starting from scratch...")
         return voices
     metadata_response.raise_for_status()
     processed_voices = [
@@ -105,15 +106,41 @@ def export_and_package(c, voice, export_script_path, working_dir):
 def dump_voices_metadata(voices, working_dir):
     _LOGGER.info("Dumping voice metadata.")
     dst_json_filename = working_dir.joinpath("metadata.json")
-    data = [
+    processed_voices = [
         asdict(voice)
         for voice in voices
     ]
     with open(dst_json_filename, "w", encoding="utf-8", newline="\n") as file:
-        json.dump(data, file, indent=2, ensure_ascii=False)
+        json.dump(processed_voices, file, indent=2, ensure_ascii=False)
     HF_CLIENT.upload_file(
         path_or_fileobj=dst_json_filename,
         path_in_repo=dst_json_filename.name,
+        repo_id=RT_VOICES_DATASET,
+        repo_type="dataset",
+    )
+    # Add a proper voices.json
+    piper_voices = requests.get(
+        CHECKPOINTS_URL_PREFIX.format("voices.json")
+    ).json()
+    std_voice_names = frozenset([v.name for v in processed_voices])
+    rt_voices = {}
+    for (vname, vdata) in piper_voices:
+        if vname in std_voice_names:
+            lang, name, quality = vname.split("-")
+            new_name = "-".join([
+                lang,
+                f"{name}+RT",
+                quality
+            ])
+            vdata["key"] = new_name
+            vdata["streaming"] = True
+            rt_voices[new_name] = vdata
+    voices_dst_filename = working_dir.joinpath("voices.json")
+    with open(voices_dst_filename, "w", encoding="utf-8", newline="\n") as voices_file:
+        json.dump(rt_voices, voices_file, indent=2, ensure_ascii=False)
+    HF_CLIENT.upload_file(
+        path_or_fileobj=voices_dst_filename,
+        path_in_repo=voices_dst_filename.name,
         repo_id=RT_VOICES_DATASET,
         repo_type="dataset",
     )
