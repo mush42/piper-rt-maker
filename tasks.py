@@ -120,11 +120,11 @@ def dump_voices_metadata(voices, working_dir):
     )
     # Add a proper voices.json
     piper_voices = requests.get(
-        CHECKPOINTS_URL_PREFIX.format("voices.json")
+        "https://huggingface.co/rhasspy/piper-voices/resolve/main/voices.json"
     ).json()
     std_voice_names = frozenset([v.name for v in processed_voices])
     rt_voices = {}
-    for (vname, vdata) in piper_voices:
+    for (vname, vdata) in piper_voices.items():
         if vname in std_voice_names:
             lang, name, quality = vname.split("-")
             new_name = "-".join([
@@ -134,6 +134,7 @@ def dump_voices_metadata(voices, working_dir):
             ])
             vdata["key"] = new_name
             vdata["streaming"] = True
+            vdata["files"] = [f"{new_name}.tar.gz"]
             rt_voices[new_name] = vdata
     voices_dst_filename = working_dir.joinpath("voices.json")
     with open(voices_dst_filename, "w", encoding="utf-8", newline="\n") as voices_file:
